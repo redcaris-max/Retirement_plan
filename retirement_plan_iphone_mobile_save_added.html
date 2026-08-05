@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>재화수지부부 10년 노후계획 웹 프로그램</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { font-family: 'Pretendard', sans-serif; }
+        .active-tab { background-color: #2563eb; color: white; }
+        .active-tab:hover { background-color: #1d4ed8; }
+        .month-btn-active { background-color: #2563eb; color: white; font-weight: bold; }
+        .year-btn-active { background-color: #1e40af; color: white; font-weight: bold; border-color: #1e40af; }
+
+        /* PDF/인쇄 시 홈(요약) 화면만 출력 */
+        @media print {
+            body { background: #fff !important; }
+            header, aside, #sec-current, #sec-simulation, #sec-dashboard, #sec-compare, #sec-history, #sec-export { display: none !important; }
+            main, #sec-home { display: block !important; width: 100% !important; max-width: none !important; }
+            .max-w-7xl, .flex-1 { max-width: none !important; width: 100% !important; }
+            .shadow-sm { box-shadow: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-blue-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-piggy-bank text-yellow-400 text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-tight">재화수지부부 10년 노후계획</h1>
+            </div>
+            <div class="flex items-center space-x-4 text-sm">
+                <button type="button" onclick="savePlanData()" class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1 transition" aria-label="현재 입력값 저장">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>SAVE</span>
+                </button>
+                <div class="hidden sm:flex items-center space-x-2 bg-blue-800 px-3 py-1.5 rounded-lg">
+                    <i class="fa-regular fa-bell text-yellow-300"></i>
+                    <span>주간 알림</span>
+                    <label class="relative inline-flex items-center cursor-pointer ml-1">
+                        <input type="checkbox" id="weeklyAlert" class="sr-only peer" checked onchange="toggleWeeklyAlert(this.checked)">
+                        <div class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                    </label>
+                </div>
+                <button onclick="copyShareLink()" class="bg-blue-700 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1 transition">
+                    <i class="fa-solid fa-share-nodes"></i>
+                    <span class="hidden sm:inline">공유 링크</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container Layout -->
+    <div class="flex-1 max-w-7xl w-full mx-auto flex flex-col md:flex-row gap-6 p-4 md:p-6">
+
+        <!-- Sidebar Navigation -->
+        <aside class="w-full md:w-64 bg-white rounded-xl shadow-sm border border-gray-200 p-4 shrink-0 h-fit">
+            <nav class="flex flex-row md:flex-col gap-1 overflow-x-auto pb-2 md:pb-0">
+                <button onclick="switchTab('home')" id="tab-home" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm font-semibold active-tab transition">
+                    <i class="fa-solid fa-house w-5"></i><span>홈 (요약)</span>
+                </button>
+                <button onclick="switchTab('current')" id="tab-current" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm font-semibold text-gray-600 hover:bg-gray-100 transition">
+                    <i class="fa-solid fa-calculator w-5"></i><span>현재 진행</span>
+                </button>
+                <button onclick="switchTab('simulation')" id="tab-simulation" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm font-semibold text-gray-600 hover:bg-gray-100 transition">
+                    <i class="fa-solid fa-sliders w-5"></i><span>시뮬레이션 10년 목표예상치</span>
+                </button>
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm font-semibold text-gray-600 hover:bg-gray-100 transition">
+                    <i class="fa-solid fa-robot w-5"></i><span>분석 대시보드 (AI)</span>
+                </button>
+                <button onclick="switchTab('compare')" id="tab-compare" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm font-semibold text-gray-600 hover:bg-gray-100 transition">
+                    <i class="fa-solid fa-code-compare w-5"></i><span>항목별 비교 (계좌별)</span>
+                </button>
+                <button onclick="switchTab('history')" id="tab-history" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm font-semibold text-gray-600 hover:bg-gray-100 transition">
+                    <i class="fa-solid fa-clock-rotate-left w-5"></i><span>분석 기록</span>
+                </button>
+                <button onclick="switchTab('export')" id="tab-export" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm font-semibold text-gray-600 hover:bg-gray-100 transition">
+                    <i class="fa-solid fa-file-export w-5"></i><span>결과 내보내기</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 min-w-0">
+
+            <!-- 화면 1: 홈 (요약) -->
+            <section id="sec-home" class="space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 mb-2">재화수지부부 10년 자산 요약 (2027년~2036년)</h2>
+                        <p class="text-gray-500 text-sm">목표 시뮬레이션 예상치와 현재 진행 상태를 비교하여 노후 목표 달성률을 확인하세요.</p>
+                    </div>
+                    <div class="text-sm font-semibold text-gray-600 whitespace-nowrap" aria-label="현재 날짜와 시간">
+                        <i class="fa-regular fa-clock mr-1 text-blue-600"></i><span id="home-current-datetime">0000-00-00 00:00</span>
+                    </div>
+                </div>
+
+                <!-- 1. Target KPI Cards (시뮬레이션 10년 목표예상치 연동) -->
+                <div>
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                        <i class="fa-solid fa-bullseye text-blue-600 mr-2"></i>목표 시뮬레이션 (10년 예상)
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-blue-600">
+                            <p class="text-xs font-semibold text-gray-500 uppercase">10년후 예상 총자산 (목표)</p>
+                            <p id="target-total-asset" class="text-2xl font-extrabold text-blue-600 mt-2">0 원</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-green-500">
+                            <p class="text-xs font-semibold text-gray-500 uppercase">총누적 세후이자 (목표)</p>
+                            <p id="target-total-interest" class="text-2xl font-extrabold text-green-600 mt-2">0 원</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-indigo-500">
+                            <p class="text-xs font-semibold text-gray-500 uppercase">월 적립 합계액 (목표)</p>
+                            <p id="target-monthly-total" class="text-2xl font-extrabold text-indigo-600 mt-2">0 원</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-purple-500">
+                            <p class="text-xs font-semibold text-gray-500 uppercase">평균 연이자율 (목표)</p>
+                            <p id="target-avg-rate" class="text-2xl font-extrabold text-purple-600 mt-2">0 %</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Current Status KPI Cards (현재진행 연동 & 달성률 표기) -->
+                <div>
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                        <i class="fa-solid fa-chart-line text-emerald-600 mr-2"></i>현재 진행 (10년 실적 예상 & 목표 달성률)
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-emerald-600 relative">
+                            <div class="flex justify-between items-start">
+                                <p class="text-xs font-semibold text-gray-500 uppercase">10년후 예상 총자산 (현재)</p>
+                                <span id="rate-badge-asset" class="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">달성률 0%</span>
+                            </div>
+                            <p id="current-total-asset" class="text-2xl font-extrabold text-emerald-600 mt-2">0 원</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-teal-500 relative">
+                            <div class="flex justify-between items-start">
+                                <p class="text-xs font-semibold text-gray-500 uppercase">총누적 세후이자 (현재)</p>
+                                <span id="rate-badge-interest" class="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">달성률 0%</span>
+                            </div>
+                            <p id="current-total-interest" class="text-2xl font-extrabold text-teal-600 mt-2">0 원</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-cyan-500 relative">
+                            <div class="flex justify-between items-start">
+                                <p class="text-xs font-semibold text-gray-500 uppercase">월 적립 합계액 (현재)</p>
+                                <span id="rate-badge-monthly" class="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">달성률 0%</span>
+                            </div>
+                            <p id="current-monthly-total" class="text-2xl font-extrabold text-cyan-600 mt-2">0 원</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-amber-500 relative">
+                            <div class="flex justify-between items-start">
+                                <p class="text-xs font-semibold text-gray-500 uppercase">평균 연이자율 (현재)</p>
+                                <span id="rate-badge-rate" class="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">달성률 0%</span>
+                            </div>
+                            <p id="current-avg-rate" class="text-2xl font-extrabold text-amber-600 mt-2">0 %</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Section -->
+                <div id="low-rate-alert" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl">
+                    <div class="flex items-center">
+                        <i class="fa-solid fa-triangle-exclamation text-red-500 text-xl mr-3"></i>
+                        <div>
+                            <p class="text-sm font-bold text-red-800">저금리 경고 (이상 수치 알림)</p>
+                            <p id="low-rate-msg" class="text-xs text-red-700 mt-1">금리가 2.5% 보다 낮은 항목이 존재합니다.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Visuals -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="font-bold text-gray-700 mb-4">10년간 자산 성장 추이 (2027년~2036년)</h3>
+                        <div class="h-64">
+                            <canvas id="homeGrowthChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="font-bold text-gray-700 mb-4">자산 구성 비중 (월 300만원)</h3>
+                        <div class="h-64 flex justify-center">
+                            <canvas id="homePieChart"></canvas>
+                        </div>
+                        <div id="home-composition-breakdown" class="mt-4 space-y-2 text-sm text-gray-600">
+                            <!-- Dynamic composition amounts and ratios -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 화면 2: 현재 진행 (2027년 ~ 2036년 연도별 확장) -->
+            <section id="sec-current" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">현재 진행 상태 입력 & 예측 (2027년 ~ 2036년)</h2>
+                        <p class="text-gray-500 text-sm">연도(2027~2036년) 및 월(1~12월)을 선택하여 금액/금리를 기입하면 종합 예측표에 즉시 반영됩니다.</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <label class="text-sm font-bold text-gray-600">분석 기간:</label>
+                        <select id="analysisYears" onchange="updateCalculations()" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-bold bg-gray-50">
+                            <option value="5">5년 (2027~2031년)</option>
+                            <option value="10" selected>10년 (2027~2036년)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Year & Month Selector Sub-Nav -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                    <!-- Year Buttons (2027~2036) -->
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-gray-700 text-sm"><i class="fa-solid fa-calendar-days text-blue-600 mr-2"></i>연도 선택 (2027년 ~ 2036년)</h3>
+                        </div>
+                        <div class="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+                            <script>
+                                for(let y=2027; y<=2036; y++) {
+                                    document.write(`<button onclick="selectYear(${y})" id="ybtn-${y}" class="year-btn py-1.5 text-xs font-semibold border rounded-lg hover:bg-blue-50 transition ${y===2027?'year-btn-active':''}">${y}년</button>`);
+                                }
+                            </script>
+                        </div>
+                    </div>
+
+                    <!-- Month Buttons (1~12) -->
+                    <div class="border-t pt-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-gray-700 text-sm"><i class="fa-regular fa-calendar-check text-blue-600 mr-2"></i>월별 상세 설정 (1월~12월)</h3>
+                            <span id="selectedPeriodLabel" class="text-xs bg-blue-100 text-blue-800 font-bold px-2.5 py-1 rounded-full">2027년 1월 설정 중</span>
+                        </div>
+                        <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1.5">
+                            <script>
+                                for(let m=1; m<=12; m++) {
+                                    document.write(`<button onclick="selectMonth(${m})" id="mbtn-${m}" class="month-btn py-2 text-xs font-semibold border rounded-lg hover:bg-gray-100 transition ${m===1?'month-btn-active':''}">${m}월</button>`);
+                                }
+                            </script>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Table with Accounting Format and Auto % Ratio -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+                    <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-gray-700">항목별 월 투자금액 및 금리 (<span id="tablePeriodTitle" class="text-blue-600">2027년 1월</span>)</h3>
+                            <p class="text-xs text-gray-400 mt-0.5">총액 기준 대비 투자 비율(%)이 자동 산출됩니다.</p>
+                        </div>
+                        <button onclick="addCurrentRow()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1">
+                            <i class="fa-solid fa-plus"></i><span>항목 추가</span>
+                        </button>
+                    </div>
+                    <table class="w-full text-sm text-left text-gray-500 min-w-[650px]">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3">항목명</th>
+                                <th class="px-4 py-3">월 투자금액 (원, 회계표시)</th>
+                                <th class="px-4 py-3">투자 비율 (%)</th>
+                                <th class="px-4 py-3">추정 월 세후 이자</th>
+                                <th class="px-4 py-3">원금대비 이자율 (%)</th>
+                                <th class="px-4 py-3">연 이자율 (%)</th>
+                                <th class="px-4 py-3">과세 구분</th>
+                                <th class="px-4 py-3 text-center">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="currentItemsBody">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                        <tfoot class="bg-gray-50 font-bold text-gray-800 border-t">
+                            <tr>
+                                <td class="px-4 py-3">월 투자 합계</td>
+                                <td id="currentTotalMonthlyDisplay" class="px-4 py-3 text-blue-600">3,000,000 원</td>
+                                <td id="currentTotalRatioDisplay" class="px-4 py-3 text-blue-600">100.0%</td>
+                                <td id="currentEstimatedMonthlyInterestDisplay" class="px-4 py-3 text-green-600">0 원</td>
+                                <td id="currentMonthlyInterestRateDisplay" class="px-4 py-3 text-green-600">0.00%</td>
+                                <td colspan="3"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Year-by-Year Results Table -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="font-bold text-gray-700 mb-4">연도별 종합 예측표 (세후 기준)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-right text-gray-600 border-collapse min-w-[600px]">
+                            <thead>
+                                <tr class="bg-blue-50 text-blue-900 border-b">
+                                    <th class="p-3 text-left">연도</th>
+                                    <th class="p-3">누적 원금</th>
+                                    <th class="p-3">누적 세전 이자</th>
+                                    <th class="p-3">누적 세후 이자</th>
+                                    <th class="p-3">이자율(%)</th>
+                                    <th class="p-3">총 합계금액</th>
+                                </tr>
+                            </thead>
+                            <tbody id="yearlySummaryBody" class="divide-y divide-gray-100">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 화면 3: 시뮬레이션 10년 목표예상치 -->
+            <section id="sec-simulation" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">시뮬레이션 10년 목표예상치</h2>
+                        <p class="text-gray-500 text-sm">목표하는 추가 투자 계획을 설정하고 미래 10년 자산의 목표 수치를 관리하세요.</p>
+                    </div>
+                    <button onclick="copyCurrentToSim()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center space-x-1">
+                        <i class="fa-solid fa-copy"></i><span>현재 진행 데이터 불러오기</span>
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+                    <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="font-bold text-gray-700">시뮬레이션 목표 항목 설정</h3>
+                        <button onclick="addSimRow()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1">
+                            <i class="fa-solid fa-plus"></i><span>항목 추가</span>
+                        </button>
+                    </div>
+                    <table class="w-full text-sm text-left text-gray-500 min-w-[600px]">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3">항목명</th>
+                                <th class="px-4 py-3">월 투자금액 (원)</th>
+                                <th class="px-4 py-3">연 이자율 (%)</th>
+                                <th class="px-4 py-3">과세 구분</th>
+                                <th class="px-4 py-3 text-center">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="simItemsBody">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Simulation Comparison Result -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="font-bold text-gray-700 mb-4">현재 진행 vs 시뮬레이션 비교 (10년 후)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <p class="text-xs text-gray-500 font-bold">현재 계획 10년 자산</p>
+                            <p id="sim-current-total" class="text-xl font-bold text-gray-800 mt-1">0 원</p>
+                        </div>
+                        <div class="p-4 bg-indigo-50 rounded-lg">
+                            <p class="text-xs text-indigo-500 font-bold">시뮬레이션 10년 목표 자산</p>
+                            <p id="sim-sim-total" class="text-xl font-bold text-indigo-700 mt-1">0 원</p>
+                        </div>
+                        <div class="p-4 bg-green-50 rounded-lg">
+                            <p class="text-xs text-green-600 font-bold">차액 (증가분)</p>
+                            <p id="sim-diff-total" class="text-xl font-bold text-green-600 mt-1">0 원</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 화면 4: 분석 결과 대시보드 -->
+            <section id="sec-dashboard" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-800">AI 자산 관리 보좌관 & 국제 금리 리포트</h2>
+                    <p class="text-gray-500 text-sm">노후 자산 보좌관 AI가 한국·미국·일본의 매주 국제 금리 동향과 맞춤 조언을 제공합니다.</p>
+                </div>
+
+                <!-- Global Interest Rates Weekly Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-t-4 border-t-blue-600">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-gray-500 uppercase">한국 (BOK 기준금리)</span>
+                            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">동결</span>
+                        </div>
+                        <p class="text-3xl font-extrabold text-gray-800">3.50 %</p>
+                        <p class="text-xs text-gray-400 mt-2">최근 변동일: 주간 동향 반영</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-t-4 border-t-indigo-600">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-gray-500 uppercase">미국 (Fed 기준금리)</span>
+                            <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold">인상 우려</span>
+                        </div>
+                        <p class="text-3xl font-extrabold text-gray-800">5.25 ~ 5.50 %</p>
+                        <p class="text-xs text-gray-400 mt-2">최근 변동일: 주간 동향 반영</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 border-t-4 border-t-red-500">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-gray-500 uppercase">일본 (BOJ 기준금리)</span>
+                            <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold">점진적 인상</span>
+                        </div>
+                        <p class="text-3xl font-extrabold text-gray-800">0.25 %</p>
+                        <p class="text-xs text-gray-400 mt-2">최근 변동일: 주간 동향 반영</p>
+                    </div>
+                </div>
+
+                <!-- AI Robot Assistant Advice Card -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row items-start gap-6">
+                    <div class="flex flex-col items-center justify-center bg-blue-50 p-5 rounded-2xl shrink-0 w-full md:w-48 text-center border border-blue-100">
+                        <div class="w-20 h-20 bg-blue-600 text-white rounded-full flex items-center justify-center text-4xl shadow-md mb-2">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <p class="font-bold text-gray-800 text-base">AI 노후 보좌관</p>
+                        <span class="text-xs text-blue-600 bg-white px-2 py-0.5 rounded-full border border-blue-200 mt-1 font-semibold">24시간 모니터링 중</span>
+                    </div>
+
+                    <!-- Speech Bubble Chat Style -->
+                    <div class="flex-1 space-y-4">
+                        <div class="relative bg-gray-100 p-5 rounded-2xl rounded-tl-none border border-gray-200 text-gray-700 leading-relaxed text-sm">
+                            <p class="font-bold text-blue-900 text-base mb-2">
+                                <i class="fa-solid fa-comment-dots text-blue-600 mr-2"></i>재화수지부부님을 위한 금주 AI 분석 리포트
+                            </p>
+                            <p class="mb-3">
+                                안녕하세요! 10년 노후 자산 관리 보좌관 로봇입니다. 이번 주 한국, 미국, 일본의 국제 금리 동향 분석 결과에 따른 자산 운용 조언을 드립니다.
+                            </p>
+                            <ul class="list-disc list-inside space-y-2 text-gray-600 bg-white p-4 rounded-xl border border-gray-200">
+                                <li><strong>미국 고금리 유지 전망:</strong> 미 연준의 고금리 장기화 기조에 따라 IRP 내 채권형 자산의 세후 이자율을 4% 이상 유지하도록 조율하는 것이 유리합니다.</li>
+                                <li><strong>CMA 및 단기 자금 관리:</strong> 한국 기준금리가 3.50%로 동결 유지됨에 따라, 월 100만원 규모의 CMA 비중은 언제든 예·적금 특판으로 이동시킬 수 있도록 유동성을 확보하세요.</li>
+                                <li><strong>카카오뱅크 적금 재투자:</strong> 만기 시점마다 세후 수령액을 절세 계좌인 IRP로 재투자하면 10년 후 복리 효과가 약 1,200만원 더 증가합니다.</li>
+                            </ul>
+                            <div class="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center text-xs text-gray-500">
+                                <span><i class="fa-solid fa-clock mr-1"></i>업데이트: 이번 주 금리 분석 완료</span>
+                                <button onclick="triggerAiReanalysis()" class="text-blue-600 hover:underline font-bold"><i class="fa-solid fa-arrows-rotate mr-1"></i>재분석 요청</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 화면 5: 항목별 비교 (계좌별) -->
+            <section id="sec-compare" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-800">항목별 수익성 비교 (계좌별)</h2>
+                    <p class="text-gray-500 text-sm">운용 중인 각각의 금융상품 및 계좌별 효율성과 수익을 나란히 비교합니다.</p>
+                </div>
+
+                <div id="compareCardsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Dynamic comparison cards injected here -->
+                </div>
+            </section>
+
+            <!-- 화면 6: 분석 기록 -->
+            <section id="sec-history" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">분석 기록 관리</h2>
+                        <p class="text-gray-500 text-sm">저장된 시뮬레이션 및 데이터 기록을 확인하고 불러옵니다.</p>
+                    </div>
+                    <button onclick="saveCurrentToHistory()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center space-x-1">
+                        <i class="fa-solid fa-bookmark"></i><span>현재 분석 결과 저장</span>
+                    </button>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="font-bold text-gray-700 mb-4">저장된 분석 스냅샷 목록</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="bg-gray-50 text-xs text-gray-500 uppercase border-b">
+                                <tr>
+                                    <th class="p-3">저장 일시</th>
+                                    <th class="p-3">분석 이름</th>
+                                    <th class="p-3">10년 예상 자산</th>
+                                    <th class="p-3">저금리 경고</th>
+                                    <th class="p-3 text-center">작동</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody" class="divide-y divide-gray-100">
+                                <!-- Dynamic History -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 화면 7: 결과 내보내기 -->
+            <section id="sec-export" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-800">결과 저장 및 보고서 내보내기</h2>
+                    <p class="text-gray-500 text-sm">분석한 노후계획 결과를 PDF 인쇄용 화면으로 출력하거나 엑셀(CSV) 파일로 저장하세요.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div onclick="exportCSV()" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-500 cursor-pointer transition flex items-center space-x-4">
+                        <div class="p-4 bg-green-100 text-green-600 rounded-full">
+                            <i class="fa-solid fa-file-excel text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-800">Excel (CSV) 내보내기</h3>
+                            <p class="text-xs text-gray-500 mt-1">연도별 세부 원금 및 이자 데이터를 엑셀용 CSV 파일로 다운로드합니다.</p>
+                        </div>
+                    </div>
+                    <div onclick="printHomeSummary()" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-500 cursor-pointer transition flex items-center space-x-4">
+                        <div class="p-4 bg-red-100 text-red-600 rounded-full">
+                            <i class="fa-solid fa-file-pdf text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-800">PDF / 인쇄하기</h3>
+                            <p class="text-xs text-gray-500 mt-1">홈(요약) 화면을 인쇄하거나 PDF 파일로 저장합니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- JavaScript Business Logic -->
+    <script>
+        // State for Year (2027~2036) and Month (1~12)
+        let selectedYear = 2027;
+        let selectedMonth = 1;
+
+        // Data Structure for 2027~2036 (10 Years, each 12 months)
+        let yearlyMonthlyDataStore = {};
+        for (let y = 2027; y <= 2036; y++) {
+            yearlyMonthlyDataStore[y] = {};
+            for (let m = 1; m <= 12; m++) {
+                yearlyMonthlyDataStore[y][m] = [
+                    { id: 1, name: "CMA", monthly: 1000000, rate: 3.0, taxType: "15.4" },
+                    { id: 2, name: "은행적금(카카오뱅크)", monthly: 1500000, rate: 3.8, taxType: "15.4" },
+                    { id: 3, name: "IRP", monthly: 500000, rate: 4.5, taxType: "0" }
+                ];
+            }
+        }
+
+        let simItems = [
+            { id: 1, name: "CMA", monthly: 1000000, rate: 3.0, taxType: "15.4" },
+            { id: 2, name: "은행적금(카카오뱅크)", monthly: 1500000, rate: 3.8, taxType: "15.4" },
+            { id: 3, name: "IRP", monthly: 500000, rate: 4.5, taxType: "0" }
+        ];
+
+        let historyLogs = [];
+        let homeGrowthChart, homePieChart;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            restorePlanData();
+            syncSavedPeriodSelection();
+            renderCurrentItems();
+            renderSimItems();
+            updateCalculations();
+            initHistory();
+            updateHomeDateTime();
+            setInterval(updateHomeDateTime, 1000);
+        });
+
+        // 현재 입력값 저장 및 복원
+        const PLAN_STORAGE_KEY = "retirementPlanSavedDataV1";
+
+        function savePlanData() {
+            try {
+                const planData = {
+                    yearlyMonthlyDataStore,
+                    simItems,
+                    selectedYear,
+                    selectedMonth,
+                    analysisYears: document.getElementById("analysisYears").value
+                };
+                localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(planData));
+                alert("현재 입력값이 저장되었습니다.");
+            } catch (error) {
+                alert("저장하지 못했습니다. Safari의 웹사이트 데이터 저장 설정을 확인해 주세요.");
+            }
+        }
+
+        function restorePlanData() {
+            try {
+                const savedData = localStorage.getItem(PLAN_STORAGE_KEY);
+                if (!savedData) return;
+
+                const planData = JSON.parse(savedData);
+                if (planData && planData.yearlyMonthlyDataStore && typeof planData.yearlyMonthlyDataStore === "object") {
+                    yearlyMonthlyDataStore = planData.yearlyMonthlyDataStore;
+                }
+                if (Array.isArray(planData.simItems)) {
+                    simItems = planData.simItems;
+                }
+                if (Number.isInteger(Number(planData.selectedYear)) && yearlyMonthlyDataStore[Number(planData.selectedYear)]) {
+                    selectedYear = Number(planData.selectedYear);
+                }
+                if (Number.isInteger(Number(planData.selectedMonth)) && Number(planData.selectedMonth) >= 1 && Number(planData.selectedMonth) <= 12) {
+                    selectedMonth = Number(planData.selectedMonth);
+                }
+                const analysisYearsEl = document.getElementById("analysisYears");
+                if (analysisYearsEl && ["5", "10"].includes(String(planData.analysisYears))) {
+                    analysisYearsEl.value = String(planData.analysisYears);
+                }
+            } catch (error) {
+                // 저장 데이터가 손상된 경우 기본값으로 계속 실행합니다.
+            }
+        }
+
+        function syncSavedPeriodSelection() {
+            document.querySelectorAll(".year-btn").forEach(btn => btn.classList.remove("year-btn-active"));
+            document.querySelectorAll(".month-btn").forEach(btn => btn.classList.remove("month-btn-active"));
+            document.getElementById(`ybtn-${selectedYear}`)?.classList.add("year-btn-active");
+            document.getElementById(`mbtn-${selectedMonth}`)?.classList.add("month-btn-active");
+            updatePeriodLabels();
+        }
+
+        // 홈(요약) 우측 상단 현재 날짜·시간 (KST)
+        function updateHomeDateTime() {
+            const timeEl = document.getElementById("home-current-datetime");
+            if (!timeEl) return;
+            const now = new Date();
+            const parts = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Seoul",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                hourCycle: "h23"
+            }).formatToParts(now);
+            const get = (type) => parts.find(part => part.type === type)?.value || "00";
+            timeEl.textContent = `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+        }
+
+        // Tab Navigation
+        function switchTab(tabKey) {
+            document.querySelectorAll("main > section").forEach(sec => sec.classList.add("hidden"));
+            document.getElementById(`sec-${tabKey}`).classList.remove("hidden");
+
+            document.querySelectorAll(".nav-btn").forEach(btn => {
+                btn.classList.remove("active-tab");
+                btn.classList.add("text-gray-600", "hover:bg-gray-100");
+            });
+
+            const activeBtn = document.getElementById(`tab-${tabKey}`);
+            activeBtn.classList.add("active-tab");
+            activeBtn.classList.remove("text-gray-600", "hover:bg-gray-100");
+
+            if(tabKey === 'home') {
+                updateCalculations();
+            }
+        }
+
+        // Helper: Number Formatter (Korean Won with commas)
+        function formatKRW(val) {
+            return Math.round(val).toLocaleString('ko-KR') + ' 원';
+        }
+
+        function formatNumberWithCommas(val) {
+            if(!val && val !== 0) return '0';
+            return Math.round(val).toLocaleString('ko-KR');
+        }
+
+        function parseNumberFromCommas(str) {
+            if(typeof str === 'number') return str;
+            return Number(String(str).replace(/,/g, '')) || 0;
+        }
+
+        // Helper for Goal Achievement Rate Badge Formatting
+        function setAchievementBadge(elemId, actual, target) {
+            const elem = document.getElementById(elemId);
+            if (!elem) return;
+
+            let pct = 0;
+            if (target > 0) {
+                pct = Math.min(Math.round((actual / target) * 100), 999);
+            }
+
+            let colorClasses = "bg-red-100 text-red-700";
+            if (pct >= 80) {
+                colorClasses = "bg-blue-100 text-blue-700 border border-blue-300";
+            } else if (pct >= 50) {
+                colorClasses = "bg-green-100 text-green-700 border border-green-300";
+            } else if (pct >= 30) {
+                colorClasses = "bg-orange-100 text-orange-700 border border-orange-300";
+            } else if (pct >= 10) {
+                colorClasses = "bg-yellow-100 text-yellow-800 border border-yellow-300";
+            }
+
+            elem.className = `text-xs font-bold px-2.5 py-0.5 rounded-full ${colorClasses}`;
+            elem.innerText = `달성률 ${pct}%`;
+        }
+
+        // Year Selection Logic (2027~2036)
+        function selectYear(y) {
+            selectedYear = y;
+            document.querySelectorAll(".year-btn").forEach(btn => btn.classList.remove("year-btn-active"));
+            document.getElementById(`ybtn-${y}`).classList.add("year-btn-active");
+            updatePeriodLabels();
+            renderCurrentItems();
+        }
+
+        // Month Selection Logic
+        function selectMonth(m) {
+            selectedMonth = m;
+            document.querySelectorAll(".month-btn").forEach(btn => btn.classList.remove("month-btn-active"));
+            document.getElementById(`mbtn-${m}`).classList.add("month-btn-active");
+            updatePeriodLabels();
+            renderCurrentItems();
+        }
+
+        function updatePeriodLabels() {
+            document.getElementById("selectedPeriodLabel").innerText = `${selectedYear}년 ${selectedMonth}월 설정 중`;
+            document.getElementById("tablePeriodTitle").innerText = `${selectedYear}년 ${selectedMonth}월`;
+        }
+
+        // Render Current Selected Month Items Table
+        function renderCurrentItems() {
+            const tbody = document.getElementById("currentItemsBody");
+            tbody.innerHTML = "";
+
+            const currentList = yearlyMonthlyDataStore[selectedYear][selectedMonth];
+            const totalMonthlySum = currentList.reduce((sum, item) => sum + Number(item.monthly), 0);
+
+            currentList.forEach((item, index) => {
+                const ratio = totalMonthlySum > 0 ? ((item.monthly / totalMonthlySum) * 100).toFixed(1) : '0.0';
+
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-3 font-semibold text-gray-800">
+                            <input type="text" value="${item.name}" onchange="updateCurrentItem(${index}, 'name', this.value)" class="border rounded px-2 py-1 w-full text-sm">
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="text" value="${formatNumberWithCommas(item.monthly)}" oninput="handleMonthlyInputChange(${index}, this)" class="border rounded px-2 py-1 w-full text-sm font-bold text-gray-700">
+                        </td>
+                        <td class="px-4 py-3 font-bold text-blue-600">
+                            ${ratio} %
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="number" step="0.1" value="${item.rate}" onchange="updateCurrentItem(${index}, 'rate', this.value)" class="border rounded px-2 py-1 w-24 text-sm ${item.rate < 2.5 ? 'border-red-500 text-red-600 font-bold' : ''}">
+                        </td>
+                        <td class="px-4 py-3">
+                            <select onchange="updateCurrentItem(${index}, 'taxType', this.value)" class="border rounded px-2 py-1 text-sm bg-white">
+                                <option value="15.4" ${item.taxType === "15.4" ? "selected" : ""}>일반과세 (15.4%)</option>
+                                <option value="0" ${item.taxType === "0" ? "selected" : ""}>비과세 (0%)</option>
+                            </select>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="removeCurrentItem(${index})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // 월 단위 추정 세후 이자: 선택한 월의 납입액에 월 금리와 과세율을 적용합니다.
+            const estimatedMonthlyPostTaxInterest = currentList.reduce((sum, item) => {
+                const monthly = Number(item.monthly) || 0;
+                const monthlyRate = (Number(item.rate) || 0) / 100 / 12;
+                const taxRate = (Number(item.taxType) || 0) / 100;
+                return sum + (monthly * monthlyRate * (1 - taxRate));
+            }, 0);
+            const monthlyInterestRate = totalMonthlySum > 0
+                ? (estimatedMonthlyPostTaxInterest / totalMonthlySum) * 100
+                : 0;
+
+            document.getElementById("currentTotalMonthlyDisplay").innerText = formatKRW(totalMonthlySum);
+            document.getElementById("currentTotalRatioDisplay").innerText = totalMonthlySum > 0 ? "100.0%" : "0.0%";
+            document.getElementById("currentEstimatedMonthlyInterestDisplay").innerText = formatKRW(estimatedMonthlyPostTaxInterest);
+            document.getElementById("currentMonthlyInterestRateDisplay").innerText = monthlyInterestRate.toFixed(2) + "%";
+        }
+
+        function handleMonthlyInputChange(index, inputElem) {
+            let rawVal = parseNumberFromCommas(inputElem.value);
+            yearlyMonthlyDataStore[selectedYear][selectedMonth][index].monthly = rawVal;
+            inputElem.value = formatNumberWithCommas(rawVal);
+            renderCurrentItems();
+            updateCalculations();
+        }
+
+        function updateCurrentItem(index, key, value) {
+            yearlyMonthlyDataStore[selectedYear][selectedMonth][index][key] = key === 'name' || key === 'taxType' ? value : Number(value);
+            renderCurrentItems();
+            updateCalculations();
+        }
+
+        function addCurrentRow() {
+            yearlyMonthlyDataStore[selectedYear][selectedMonth].push({ id: Date.now(), name: "신규 적립 항목", monthly: 500000, rate: 3.5, taxType: "15.4" });
+            renderCurrentItems();
+            updateCalculations();
+        }
+
+        function removeCurrentItem(index) {
+            yearlyMonthlyDataStore[selectedYear][selectedMonth].splice(index, 1);
+            renderCurrentItems();
+            updateCalculations();
+        }
+
+        // Calculations Engine with Multi-Year (2027~2036) Simulation
+        // 각 연도 12월 말 기준으로, 해당 시점까지 납입된 원금과 이자를 계산합니다.
+        // 월 납입금은 해당 월에 1개월치 이자가 발생하는 기존 계산 가정을 유지합니다.
+        function calculateYearlyActualPlan(years) {
+            const yearlyData = [];
+            let totalLowRateCount = 0;
+            let sumRates = 0;
+            let totalItemsCount = 0;
+
+            for (let endYearIndex = 0; endYearIndex < years; endYearIndex++) {
+                let accumulatedPrincipal = 0;
+                let accumulatedPreTaxInterest = 0;
+                let accumulatedPostTaxInterest = 0;
+
+                for (let depositYearIndex = 0; depositYearIndex <= endYearIndex; depositYearIndex++) {
+                    const depositYear = 2027 + depositYearIndex;
+
+                    for (let depositMonth = 1; depositMonth <= 12; depositMonth++) {
+                        const items = yearlyMonthlyDataStore[depositYear][depositMonth] || [];
+
+                        items.forEach(item => {
+                            const monthlyAmount = Number(item.monthly) || 0;
+                            const monthlyRate = (Number(item.rate) || 0) / 100 / 12;
+                            const taxRate = (Number(item.taxType) || 0) / 100;
+                            // 납입월부터 해당 연도 12월까지의 운용 개월 수
+                            const monthsElapsed = (endYearIndex - depositYearIndex) * 12 + (13 - depositMonth);
+                            const preTaxInterest = monthlyAmount * (Math.pow(1 + monthlyRate, monthsElapsed) - 1);
+                            const postTaxInterest = preTaxInterest * (1 - taxRate);
+
+                            accumulatedPrincipal += monthlyAmount;
+                            accumulatedPreTaxInterest += preTaxInterest;
+                            accumulatedPostTaxInterest += postTaxInterest;
+
+                            // 평균 금리/저금리 경고는 분석 기간의 실제 입력 항목을 기준으로 집계
+                            if (endYearIndex === years - 1) {
+                                if (Number(item.rate) < 2.5) totalLowRateCount++;
+                                sumRates += Number(item.rate) || 0;
+                                totalItemsCount++;
+                            }
+                        });
+                    }
+                }
+
+                yearlyData.push({
+                    yearNum: endYearIndex + 1,
+                    calYear: 2027 + endYearIndex,
+                    principal: accumulatedPrincipal,
+                    preTaxInterest: accumulatedPreTaxInterest,
+                    interest: accumulatedPostTaxInterest,
+                    interestRate: accumulatedPrincipal > 0 ? (accumulatedPostTaxInterest / accumulatedPrincipal) * 100 : 0,
+                    total: accumulatedPrincipal + accumulatedPostTaxInterest
+                });
+            }
+
+            const avgRate = totalItemsCount > 0 ? (sumRates / totalItemsCount).toFixed(2) : 0;
+            const firstYearMonthlyTotal = yearlyData.length ? yearlyData[0].principal / 12 : 0;
+            const lastYear = yearlyData[yearlyData.length - 1] || {};
+
+            return {
+                yearlyData,
+                totalMonthly: firstYearMonthlyTotal,
+                avgRate,
+                lowRateCount: totalLowRateCount,
+                finalTotal: lastYear.total || 0,
+                finalPrincipal: lastYear.principal || 0,
+                finalPreTaxInterest: lastYear.preTaxInterest || 0,
+                finalInterest: lastYear.interest || 0
+            };
+        }
+
+        // Constant Sim Calculations
+        function calculatePlan(items, years) {
+            let yearlyData = [];
+            let totalMonthly = items.reduce((sum, item) => sum + Number(item.monthly), 0);
+
+            for (let y = 1; y <= years; y++) {
+                let months = y * 12;
+                let accumulatedPrincipal = 0;
+                let accumulatedInterest = 0;
+
+                items.forEach(item => {
+                    let mAmount = Number(item.monthly);
+                    let r = Number(item.rate) / 100 / 12;
+                    let taxRate = Number(item.taxType) / 100;
+
+                    let itemPrincipal = mAmount * months;
+                    let itemTotal = 0;
+                    for (let m = 1; m <= months; m++) {
+                        itemTotal += mAmount * Math.pow(1 + r, months - m + 1);
+                    }
+                    let preTaxInterest = itemTotal - itemPrincipal;
+                    let postTaxInterest = preTaxInterest * (1 - taxRate);
+
+                    accumulatedPrincipal += itemPrincipal;
+                    accumulatedInterest += postTaxInterest;
+                });
+
+                yearlyData.push({
+                    year: y,
+                    principal: accumulatedPrincipal,
+                    interest: accumulatedInterest,
+                    total: accumulatedPrincipal + accumulatedInterest
+                });
+            }
+
+            let avgRate = items.length > 0 ? (items.reduce((sum, item) => sum + Number(item.rate), 0) / items.length).toFixed(2) : 0;
+            let lowRateCount = items.filter(item => Number(item.rate) < 2.5).length;
+
+            return {
+                yearlyData,
+                totalMonthly,
+                avgRate,
+                lowRateCount,
+                finalTotal: yearlyData[yearlyData.length - 1]?.total || 0,
+                finalPrincipal: yearlyData[yearlyData.length - 1]?.principal || 0,
+                finalInterest: yearlyData[yearlyData.length - 1]?.interest || 0
+            };
+        }
+
+        // Render Simulation Items
+        function renderSimItems() {
+            const tbody = document.getElementById("simItemsBody");
+            tbody.innerHTML = "";
+
+            simItems.forEach((item, index) => {
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-3">
+                            <input type="text" value="${item.name}" onchange="updateSimItem(${index}, 'name', this.value)" class="border rounded px-2 py-1 w-full text-sm">
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="number" value="${item.monthly}" onchange="updateSimItem(${index}, 'monthly', this.value)" class="border rounded px-2 py-1 w-full text-sm font-bold">
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="number" step="0.1" value="${item.rate}" onchange="updateSimItem(${index}, 'rate', this.value)" class="border rounded px-2 py-1 w-24 text-sm">
+                        </td>
+                        <td class="px-4 py-3">
+                            <select onchange="updateSimItem(${index}, 'taxType', this.value)" class="border rounded px-2 py-1 text-sm">
+                                <option value="15.4" ${item.taxType === "15.4" ? "selected" : ""}>일반과세 (15.4%)</option>
+                                <option value="0" ${item.taxType === "0" ? "selected" : ""}>비과세 (0%)</option>
+                            </select>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="removeSimItem(${index})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function updateSimItem(index, key, value) {
+            simItems[index][key] = key === 'name' || key === 'taxType' ? value : Number(value);
+            renderSimItems();
+            updateCalculations();
+        }
+
+        function addSimRow() {
+            simItems.push({ id: Date.now(), name: "추가 투자 항목", monthly: 300000, rate: 4.0, taxType: "15.4" });
+            renderSimItems();
+            updateCalculations();
+        }
+
+        function removeSimItem(index) {
+            simItems.splice(index, 1);
+            renderSimItems();
+            updateCalculations();
+        }
+
+        function copyCurrentToSim() {
+            simItems = JSON.parse(JSON.stringify(yearlyMonthlyDataStore[selectedYear][selectedMonth]));
+            renderSimItems();
+            updateCalculations();
+            alert(`${selectedYear}년 ${selectedMonth}월 데이터가 시뮬레이션 항목으로 복사되었습니다.`);
+        }
+
+        // Global Update Calculations
+        function updateCalculations() {
+            const years = Number(document.getElementById("analysisYears").value);
+            const currentRes = calculateYearlyActualPlan(years);
+            const simRes = calculatePlan(simItems, years);
+
+            // 1. Home Target KPI Cards (시뮬레이션 10년 목표예상치 연동)
+            document.getElementById("target-total-asset").innerText = formatKRW(simRes.finalTotal);
+            document.getElementById("target-total-interest").innerText = formatKRW(simRes.finalInterest);
+            document.getElementById("target-monthly-total").innerText = formatKRW(simRes.totalMonthly);
+            document.getElementById("target-avg-rate").innerText = simRes.avgRate + " %";
+
+            // 2. Home Current KPI Cards (현재 진행 연동 & 달성률 표기)
+            document.getElementById("current-total-asset").innerText = formatKRW(currentRes.finalTotal);
+            document.getElementById("current-total-interest").innerText = formatKRW(currentRes.finalInterest);
+            document.getElementById("current-monthly-total").innerText = formatKRW(currentRes.totalMonthly);
+            document.getElementById("current-avg-rate").innerText = currentRes.avgRate + " %";
+
+            // Calculate and Apply Badges
+            setAchievementBadge("rate-badge-asset", currentRes.finalTotal, simRes.finalTotal);
+            setAchievementBadge("rate-badge-interest", currentRes.finalInterest, simRes.finalInterest);
+            setAchievementBadge("rate-badge-monthly", currentRes.totalMonthly, simRes.totalMonthly);
+            setAchievementBadge("rate-badge-rate", currentRes.avgRate, simRes.avgRate);
+
+            // Low Rate Alert Check
+            const alertBox = document.getElementById("low-rate-alert");
+            if(currentRes.lowRateCount > 0) {
+                alertBox.classList.remove("hidden");
+                document.getElementById("low-rate-msg").innerText = `현재 설정된 항목 중 연 금리가 2.5% 미만인 항목이 ${currentRes.lowRateCount}개 포함되어 있습니다. 금리 재조정을 권장합니다.`;
+            } else {
+                alertBox.classList.add("hidden");
+            }
+
+            // 3. Yearly Summary Table (1년차 (2027년) 표기 적용)
+            const yearlyBody = document.getElementById("yearlySummaryBody");
+            yearlyBody.innerHTML = "";
+            currentRes.yearlyData.forEach(row => {
+                yearlyBody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 text-left font-bold text-gray-700">${row.yearNum}년차 (${row.calYear}년)</td>
+                        <td class="p-3 font-semibold">${formatKRW(row.principal)}</td>
+                        <td class="p-3 text-emerald-600 font-semibold">+ ${formatKRW(row.preTaxInterest)}</td>
+                        <td class="p-3 text-green-600 font-semibold">+ ${formatKRW(row.interest)}</td>
+                        <td class="p-3 text-purple-600 font-semibold">${row.interestRate.toFixed(2)}%</td>
+                        <td class="p-3 text-blue-900 font-extrabold">${formatKRW(row.total)}</td>
+                    </tr>
+                `;
+            });
+
+            // 4. Simulation Result
+            document.getElementById("sim-current-total").innerText = formatKRW(currentRes.finalTotal);
+            document.getElementById("sim-sim-total").innerText = formatKRW(simRes.finalTotal);
+            const diff = simRes.finalTotal - currentRes.finalTotal;
+            document.getElementById("sim-diff-total").innerText = (diff >= 0 ? "+ " : "") + formatKRW(diff);
+
+            // 5. Compare Cards
+            renderCompareCards(yearlyMonthlyDataStore[selectedYear][selectedMonth], years);
+
+            // 6. Draw Charts
+            renderCharts(currentRes, yearlyMonthlyDataStore[selectedYear][selectedMonth]);
+        }
+
+        function renderCompareCards(currentItems, years) {
+            const container = document.getElementById("compareCardsContainer");
+            container.innerHTML = "";
+
+            currentItems.forEach(item => {
+                let singleRes = calculatePlan([item], years);
+                container.innerHTML += `
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-gray-800">${item.name}</h3>
+                            <span class="text-xs px-2 py-1 rounded ${item.rate < 2.5 ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'} font-bold">${item.rate.toFixed(1)}%</span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div class="flex justify-between"><span>설정 월 납입액:</span> <span class="font-bold">${formatKRW(item.monthly)}</span></div>
+                            <div class="flex justify-between"><span>${years}년 총 원금:</span> <span>${formatKRW(singleRes.finalPrincipal)}</span></div>
+                            <div class="flex justify-between"><span>${years}년 세후 이자:</span> <span class="text-green-600 font-bold">+ ${formatKRW(singleRes.finalInterest)}</span></div>
+                            <div class="border-t pt-2 flex justify-between font-bold text-gray-800">
+                                <span>예상 총액:</span>
+                                <span class="text-blue-600">${formatKRW(singleRes.finalTotal)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderCharts(resData, currentItems) {
+            const labels = resData.yearlyData.map(d => `${d.yearNum}년차 (${d.calYear}년)`);
+            const totals = resData.yearlyData.map(d => d.total);
+
+            if (homeGrowthChart) homeGrowthChart.destroy();
+            if (homePieChart) homePieChart.destroy();
+
+            homeGrowthChart = new Chart(document.getElementById('homeGrowthChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '총 자산(원)',
+                        data: totals,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 현재진행 전체 기간의 항목별 누적 세후 금액으로 자산 구성 비중을 표시합니다.
+            const composition = calculateCurrentAssetComposition();
+            const compositionTotal = composition.reduce((sum, item) => sum + item.amount, 0);
+            const compositionColors = ['#2563eb', '#10b981', '#6366f1', '#f59e0b', '#ec4899'];
+
+            homePieChart = new Chart(document.getElementById('homePieChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: composition.map(item => item.name),
+                    datasets: [{
+                        data: composition.map(item => item.amount),
+                        backgroundColor: compositionColors
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const compositionBreakdown = document.getElementById("home-composition-breakdown");
+            compositionBreakdown.innerHTML = composition.map((item, index) => {
+                const ratio = compositionTotal > 0 ? (item.amount / compositionTotal * 100) : 0;
+                return `
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="flex items-center min-w-0"><span class="inline-block w-2.5 h-2.5 rounded-full mr-2 shrink-0" style="background-color:${compositionColors[index % compositionColors.length]}"></span>${item.name}</span>
+                        <span class="font-semibold text-gray-700 whitespace-nowrap">${formatKRW(item.amount)} (${ratio.toFixed(1)}%)</span>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        // 현재진행의 월별 납입 데이터를 기준으로, 계획 종료 시점의 항목별 누적 세후 금액을 계산합니다.
+        function calculateCurrentAssetComposition() {
+            const amountsByName = {};
+            const years = Number(document.getElementById("analysisYears").value);
+
+            for (let yIndex = 0; yIndex < years; yIndex++) {
+                const year = 2027 + yIndex;
+                for (let month = 1; month <= 12; month++) {
+                    const items = yearlyMonthlyDataStore[year][month] || [];
+                    items.forEach(item => {
+                        const monthly = Number(item.monthly) || 0;
+                        const monthlyRate = (Number(item.rate) || 0) / 100 / 12;
+                        const taxRate = (Number(item.taxType) || 0) / 100;
+                        const monthsLeft = (years - yIndex) * 12 - month + 1;
+                        const preTaxInterest = monthly * (Math.pow(1 + monthlyRate, monthsLeft) - 1);
+                        const postTaxAmount = monthly + preTaxInterest * (1 - taxRate);
+                        amountsByName[item.name] = (amountsByName[item.name] || 0) + postTaxAmount;
+                    });
+                }
+            }
+
+            return Object.entries(amountsByName).map(([name, amount]) => ({ name, amount }));
+        }
+
+        function triggerAiReanalysis() {
+            alert("AI 자산 보좌관이 최신 국제 금리 데이터를 바탕으로 재분석을 완료했습니다!");
+        }
+
+        // History Management
+        function initHistory() {
+            historyLogs = [
+                { id: 1, date: "2026-08-01 10:30", name: "초기 10년 노후 기본 안 (2027~2036)", total: 412000000, lowAlert: false },
+                { id: 2, date: "2026-08-03 14:15", name: "CMA 금리 인상 시뮬레이션", total: 425000000, lowAlert: true }
+            ];
+            renderHistoryTable();
+        }
+
+        function renderHistoryTable() {
+            const tbody = document.getElementById("historyTableBody");
+            tbody.innerHTML = "";
+            historyLogs.forEach((item, index) => {
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-3 text-xs text-gray-500">${item.date}</td>
+                        <td class="p-3 font-semibold text-gray-800">${item.name}</td>
+                        <td class="p-3 font-bold text-blue-600">${formatKRW(item.total)}</td>
+                        <td class="p-3">${item.lowAlert ? '<span class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">있음</span>' : '<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">없음</span>'}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="deleteHistory(${index})" class="text-red-500 text-xs hover:underline">삭제</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function saveCurrentToHistory() {
+            const years = Number(document.getElementById("analysisYears").value);
+            const res = calculateYearlyActualPlan(years);
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            
+            historyLogs.unshift({
+                id: Date.now(),
+                date: dateStr,
+                name: `2027~2036 노후계획 (${Math.round(res.totalMonthly / 10000)}만원/월)`,
+                total: res.finalTotal,
+                lowAlert: res.lowRateCount > 0
+            });
+            renderHistoryTable();
+            alert("현재 분석 스냅샷이 저장되었습니다.");
+        }
+
+        function deleteHistory(index) {
+            historyLogs.splice(index, 1);
+            renderHistoryTable();
+        }
+
+        // Export CSV
+        // 홈(요약) 화면만 PDF/인쇄 대상으로 표시합니다.
+        function printHomeSummary() {
+            switchTab("home");
+            updateHomeDateTime();
+            // 차트가 홈 화면에서 다시 그려진 뒤 인쇄 대화상자를 엽니다.
+            setTimeout(() => window.print(), 300);
+        }
+
+        function exportCSV() {
+            const years = Number(document.getElementById("analysisYears").value);
+            const res = calculateYearlyActualPlan(years);
+            
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += "연도,누적원금,누적세전이자,누적세후이자,이자율(%),총합계금액\n";
+            
+            res.yearlyData.forEach(row => {
+                csvContent += `${row.yearNum}년차 (${row.calYear}년),${row.principal},${row.preTaxInterest},${row.interest},${row.interestRate.toFixed(2)},${row.total}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "재화수지부부_10년노후계획_2027-2036.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function copyShareLink() {
+            navigator.clipboard.writeText(window.location.href);
+            alert("공유 링크가 클립보드에 복사되었습니다!");
+        }
+
+        function toggleWeeklyAlert(checked) {
+            if(checked) {
+                alert("일주일 자동 반복 알림이 설정되었습니다.");
+            } else {
+                alert("주간 알림 설정이 해제되었습니다.");
+            }
+        }
+    </script>
+</body>
+</html>
